@@ -1,0 +1,43 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Download Dalamud
+        run: |
+          wget -q https://goatcorp.github.io/dalamud-distrib/latest.zip -O dalamud.zip
+          unzip -q dalamud.zip -d ~/dalamud
+
+      - name: Build
+        run: dotnet build -c Release -p:DalamudLibPath=$HOME/dalamud -p:IsPlogonBuild=True
+
+      - name: Create release artifact
+        if: startsWith(github.ref, 'refs/tags/')
+        run: cd bin/Release && zip -r ../../FootIK.zip .
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: FootIK.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
