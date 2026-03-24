@@ -72,6 +72,14 @@ public class Config : IPluginConfiguration
     /// <summary>User-defined deny exceptions. Override everything.</summary>
     public List<string> ExtraDenyPatterns  { get; set; } = [];
 
+    // ── Condition-based disable ──────────────────────────────────────────────
+    /// <summary>Disable IK during in-engine cutscenes.</summary>
+    public bool DisableInCutscene { get; set; } = true;
+    /// <summary>Disable IK while in Group Pose (GPose).</summary>
+    public bool DisableInGPose    { get; set; } = true;
+    /// <summary>Disable IK while bound by duty (instances, trials, raids).</summary>
+    public bool DisableInDuty     { get; set; } = false;
+
     // ── Debug ────────────────────────────────────────────────────────────────
     public bool ShowDebugOverlay { get; set; } = false;
 }

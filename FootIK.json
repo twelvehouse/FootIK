@@ -2,7 +2,7 @@
   "Author": "twelvehouse",
   "Name": "FootIK",
   "InternalName": "FootIK",
-  "AssemblyVersion": "1.0.0.0",
+  "AssemblyVersion": "1.1.0.0",
   "Description": "Real-time foot IK for FFXIV characters. Keeps feet planted naturally on terrain (stairs, slopes, uneven ground) during normal gameplay.",
   "ApplicableVersion": "any",
   "DalamudApiLevel": 14,

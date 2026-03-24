@@ -118,6 +118,31 @@ public sealed class ConfigWindow : Window
             ImGui.Separator();
             ImGui.Spacing();
 
+            ImGui.Spacing();
+            ImGui.Separator();
+            ImGui.Spacing();
+
+            ImGui.TextUnformatted("Disable IK automatically:");
+            ImGui.Spacing();
+
+            if (CheckboxConfig("During cutscenes", Cfg.DisableInCutscene, out var dic))
+                Cfg.DisableInCutscene = dic;
+            HelpMarker("Suppress foot IK during in-engine cutscenes.");
+
+            if (CheckboxConfig("During GPose", Cfg.DisableInGPose, out var dig))
+                Cfg.DisableInGPose = dig;
+            HelpMarker("Suppress foot IK while Group Pose is active.");
+
+            if (CheckboxConfig("During duties / instances", Cfg.DisableInDuty, out var did))
+                Cfg.DisableInDuty = did;
+            HelpMarker(
+                "Suppress foot IK while bound by duty (dungeons, trials, raids).\n" +
+                "Useful if you always pull the camera far back in content.");
+
+            ImGui.Spacing();
+            ImGui.Separator();
+            ImGui.Spacing();
+
             if (CheckboxConfig("Show debug overlay", Cfg.ShowDebugOverlay, out var dbg))
                 Cfg.ShowDebugOverlay = dbg;
             ImGui.SameLine();

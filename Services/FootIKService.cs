@@ -1,8 +1,10 @@
 using System.Numerics;
 using System.Text.RegularExpressions;
+using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Plugin.Services;
+using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using FFXIVClientStructs.Havok.Animation.Rig;
@@ -115,6 +117,7 @@ public unsafe class FootIKService : IDisposable
     private readonly GroundDetectionService _ground;
     private readonly HavokIKService         _havokIK;
     private readonly SkeletonAccessService  _skeleton;
+    private readonly ICondition             _condition;
     private readonly IPluginLog             _log;
 
     public FootIKService(
@@ -125,6 +128,7 @@ public unsafe class FootIKService : IDisposable
         HavokIKService havokIK,
         SkeletonAccessService skeleton,
         IDataManager dataManager,
+        ICondition condition,
         IPluginLog log)
     {
         _config    = config;
@@ -133,6 +137,7 @@ public unsafe class FootIKService : IDisposable
         _ground    = ground;
         _havokIK   = havokIK;
         _skeleton  = skeleton;
+        _condition = condition;
         _log       = log;
         _actionTimelineSheet = dataManager.GetExcelSheet<ActionTimeline>();
 
@@ -159,6 +164,8 @@ public unsafe class FootIKService : IDisposable
         float dt      = (float)fw.UpdateDelta.TotalSeconds;
         ulong localId = _objects.LocalPlayer?.GameObjectId ?? ulong.MaxValue;
 
+        bool suppressed = IsIkSuppressedByCondition();
+
         var activeIds = new HashSet<ulong>();
 
         foreach (var obj in _objects)
@@ -181,29 +188,38 @@ public unsafe class FootIKService : IDisposable
             state.Velocity     = MathF.Max(1f, Vector3.Distance(rootPos, state.LastPosition) / MathF.Max(dt, 0.001f));
             state.LastPosition = rootPos;
 
-            // Find ankle/toe bones across all partial skeletons.
-            hkaPose* pose  = null;
-            int ankleL = -1, ankleR = -1, toeL = -1, toeR = -1;
-            for (int pi = 0; pi < skel->PartialSkeletonCount; pi++)
+            if (suppressed)
             {
-                var p = SkeletonAccessService.GetPose(&skel->PartialSkeletons[pi]);
-                if (p == null) continue;
-                int al = _skeleton.FindBoneIndex(p, BoneAnkleL);
-                int ar = _skeleton.FindBoneIndex(p, BoneAnkleR);
-                if (al >= 0 || ar >= 0)
-                {
-                    pose   = p;
-                    ankleL = al;
-                    ankleR = ar;
-                    toeL   = _skeleton.FindBoneIndex(p, BoneToeL);
-                    toeR   = _skeleton.FindBoneIndex(p, BoneToeR);
-                    break;
-                }
+                // Force grounded=false so FalloffWeight smoothly decays to 0 in Phase B.
+                state.Grounded[0] = false;
+                state.Grounded[1] = false;
             }
-            if (pose == null) continue;
+            else
+            {
+                // Find ankle/toe bones across all partial skeletons.
+                hkaPose* pose  = null;
+                int ankleL = -1, ankleR = -1, toeL = -1, toeR = -1;
+                for (int pi = 0; pi < skel->PartialSkeletonCount; pi++)
+                {
+                    var p = SkeletonAccessService.GetPose(&skel->PartialSkeletons[pi]);
+                    if (p == null) continue;
+                    int al = _skeleton.FindBoneIndex(p, BoneAnkleL);
+                    int ar = _skeleton.FindBoneIndex(p, BoneAnkleR);
+                    if (al >= 0 || ar >= 0)
+                    {
+                        pose   = p;
+                        ankleL = al;
+                        ankleR = ar;
+                        toeL   = _skeleton.FindBoneIndex(p, BoneToeL);
+                        toeR   = _skeleton.FindBoneIndex(p, BoneToeR);
+                        break;
+                    }
+                }
+                if (pose == null) continue;
 
-            FeetSolver(state, pose, 0, ankleL, toeL, rootPos, charRot);
-            FeetSolver(state, pose, 1, ankleR, toeR, rootPos, charRot);
+                FeetSolver(state, pose, 0, ankleL, toeL, rootPos, charRot);
+                FeetSolver(state, pose, 1, ankleR, toeR, rootPos, charRot);
+            }
 
             bool isGrounded = state.Grounded[0] || state.Grounded[1];
             // velocity=1f: falloff blending should not be velocity-scaled.
@@ -267,6 +283,23 @@ public unsafe class FootIKService : IDisposable
         {
             state.GroundYToe[side] = state.GroundY[side];
         }
+    }
+
+    // ── Condition-based suppression ───────────────────────────────────────────
+
+    private unsafe bool IsIkSuppressedByCondition()
+    {
+        if (_config.DisableInCutscene &&
+            (_condition[ConditionFlag.OccupiedInCutSceneEvent] || _condition[ConditionFlag.WatchingCutscene]))
+            return true;
+
+        if (_config.DisableInGPose && GameMain.IsInGPose())
+            return true;
+
+        if (_config.DisableInDuty && _condition[ConditionFlag.BoundByDuty])
+            return true;
+
+        return false;
     }
 
     // ── Phase B — ApplyFootIK (UpdateBonePhysics hook) ───────────────────────

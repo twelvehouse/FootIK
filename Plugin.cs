@@ -1,3 +1,4 @@
+using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.Command;
 using Dalamud.Game.ClientState.Objects;
 using Dalamud.Interface.Windowing;
@@ -23,6 +24,7 @@ public sealed class Plugin : IDalamudPlugin
     public IGameInteropProvider GameInterop { get; init; }
     public IGameGui GameGui { get; init; }
     public IDataManager DataManager { get; init; }
+    public ICondition Condition { get; init; }
 
     // ── Plugin state ─────────────────────────────────────────────────────────
     public Config Config { get; init; }
@@ -45,7 +47,8 @@ public sealed class Plugin : IDalamudPlugin
         ISigScanner sigScanner,
         IGameInteropProvider gameInterop,
         IGameGui gameGui,
-        IDataManager dataManager)
+        IDataManager dataManager,
+        ICondition condition)
     {
         Interface      = pluginInterface;
         Log            = log;
@@ -56,6 +59,7 @@ public sealed class Plugin : IDalamudPlugin
         GameInterop    = gameInterop;
         GameGui        = gameGui;
         DataManager    = dataManager;
+        Condition      = condition;
 
         Config = Interface.GetPluginConfig() as Config ?? new Config();
 
@@ -63,7 +67,7 @@ public sealed class Plugin : IDalamudPlugin
         HavokIK         = new HavokIKService(SigScanner, Log);
         SkeletonAccess  = new SkeletonAccessService(SigScanner, GameInterop, Log);
         FootIK          = new FootIKService(Config, ObjectTable, Framework,
-                              GroundDetection, HavokIK, SkeletonAccess, DataManager, Log);
+                              GroundDetection, HavokIK, SkeletonAccess, DataManager, Condition, Log);
 
         ConfigWindow = new ConfigWindow(this);
         WindowSystem.AddWindow(ConfigWindow);
@@ -79,7 +83,7 @@ public sealed class Plugin : IDalamudPlugin
         Interface.UiBuilder.OpenConfigUi += OnOpenConfigUi;
         Interface.UiBuilder.OpenMainUi   += OnOpenConfigUi;
 
-        Log.Information("[FootIK] Plugin v1.2.5 loaded.");
+        Log.Information("[FootIK] Plugin v1.1.0 loaded.");
     }
 
     public void SaveConfig() => Interface.SavePluginConfig(Config);
